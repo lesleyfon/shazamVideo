@@ -96,8 +96,8 @@ for (let i = 0; i < n; i++) {
 	}
 }
 
-fs.createWriteStream("shaamTracks.json", "");
+fs.createWriteStream("shazamTracks.json", "");
 
-fs.appendFile("shaamTracks.json", JSON.stringify(shazamTracks), (err) => {
+fs.appendFile("shazamTracks.json", JSON.stringify(shazamTracks), (err) => {
 	if (err) console.log(err);
 });
