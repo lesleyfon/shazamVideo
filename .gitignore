@@ -1,5 +1,6 @@
 input.mp4
 package-lock.json
+.env
 
 /node_modules
 .DS_Store

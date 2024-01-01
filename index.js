@@ -1,11 +1,12 @@
 import { createWorker } from "tesseract.js";
-import SpotifyWebApi from "spotify-web-api-node";
+import SpotifyWebApi from "./spotifysdk.js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
-class ShazamTrackExtractor {
+class ShazamTrackExtractor extends SpotifyWebApi {
 	constructor() {
+		super();
 		this.__dirname = path.dirname(fileURLToPath(import.meta.url));
 		this.screenshotDir = this.__dirname + "/screenshots";
 		this.screenshotFileNames = fs
@@ -84,9 +85,17 @@ class ShazamTrackExtractor {
 			if (err) console.log(err);
 		});
 	}
+
 	async run() {
-		// await this.extractTextFromImages();
-		this.extractShazamTracks();
+		this.access_token = await this.getUserAccessToken();
+
+		console.log(this.access_token);
+
+		this.setAccessToken(this.access_token);
+		const response = await this.searchTrack(
+			"remaster%2520track:Amapiano%2520artist:Asake%20&%20Olamide"
+		);
+		console.log(response);
 	}
 }
 
