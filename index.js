@@ -14,6 +14,8 @@ class ShazamTrackExtractor extends SpotifyWebApi {
 			.sort((a, b) => (a > b ? 1 : -1));
 		this.pathToOutputFile = this.__dirname + "/output.txt";
 		this.outputJson = "shazamOutput.json";
+		this.shazamTracksOutputPath = "/shazamTracks.json";
+
 		this.regExpToMatchMonthNameAbbr =
 			/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s(0[1-9]|[12][0-9]|3[01]),\s\d{4}\b/g;
 	}
@@ -86,16 +88,24 @@ class ShazamTrackExtractor extends SpotifyWebApi {
 		});
 	}
 
+	getShazamJsonOutputData = (path, fs) => {
+		return new Promise((resolve, reject) => {
+			fs.readFile(path + this.shazamTracksOutputPath, "utf8", (err, data) => {
+				if (err) {
+					reject(err);
+				}
+				resolve(data);
+			});
+		});
+	};
+
 	async run() {
+		// Get and set spotify access data
 		this.access_token = await this.getUserAccessToken();
-
-		console.log(this.access_token);
-
 		this.setAccessToken(this.access_token);
-		const response = await this.searchTrack(
-			"remaster%2520track:Amapiano%2520artist:Asake%20&%20Olamide"
-		);
-		console.log(response);
+
+		this.shazamTracksOutputJsonData = await this.getShazamJsonOutputData(this.__dirname, fs);
+		// this.getTracksAndAddTracksToPlaylist(fs);
 	}
 }
 
