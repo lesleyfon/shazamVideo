@@ -88,7 +88,7 @@ class ShazamTrackExtractor extends SpotifyWebApi {
 		});
 	}
 
-	getShazamJsonOutputData = (path, fs) => {
+	getShazamJsonOutputData = () => {
 		return new Promise((resolve, reject) => {
 			fs.readFile(path + this.shazamTracksOutputPath, "utf8", (err, data) => {
 				if (err) {
@@ -99,16 +99,17 @@ class ShazamTrackExtractor extends SpotifyWebApi {
 		});
 	};
 
-	async run() {
+	async run(code) {
 		// Get and set spotify access data
 		this.access_token = await this.getUserAccessToken();
 		this.setAccessToken(this.access_token);
+		this.shazamTracksOutputJsonData = await this.getShazamJsonOutputData();
+		this.getTracksAndAddTracksToPlaylist();
 
-		this.shazamTracksOutputJsonData = await this.getShazamJsonOutputData(this.__dirname, fs);
-		// this.getTracksAndAddTracksToPlaylist(fs);
+		// await this.addToPL(code);
 	}
 }
 
 const extractor = new ShazamTrackExtractor();
 
-extractor.run();
+export default extractor;

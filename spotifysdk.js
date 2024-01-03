@@ -1,9 +1,21 @@
 import SpotifyWebApi from "spotify-web-api-node";
 import dotenv from "dotenv";
+import fs from "fs/promises";
+import { fileURLToPath } from "url";
+import path from "path";
+import axios from "axios";
 
 dotenv.config();
 
-const config = process.env;
+const {
+	CLIENT_ID,
+	CLIENT_SECRET,
+	SPOTIFY_CALLBACK_URL,
+	ENCODED_SPOTIFY_CALLBACK_URL,
+	PLAYLIST_ID,
+	SPOTIFY_API_BASE_URL,
+	SPOTIFY_TOKEN_API_BASE_URL,
+} = process.env;
 
 /**
  * 	1. Read shazam json
@@ -16,21 +28,35 @@ const config = process.env;
 export default class SpotifyWrapper extends SpotifyWebApi {
 	access_token;
 	shazamTracksOutputJsonData;
+	playlistId = PLAYLIST_ID;
+	encodedRedirectURI = ENCODED_SPOTIFY_CALLBACK_URL;
+	authorization = `Basic ${new Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString("base64")}`;
+	spotifyAPIBaseURL = SPOTIFY_API_BASE_URL;
+	spotifyTokenAPIBaseURL = SPOTIFY_TOKEN_API_BASE_URL;
+	redirectUri = SPOTIFY_CALLBACK_URL;
+	clientId = CLIENT_ID;
+	clientSecret = CLIENT_SECRET;
 	constructor() {
 		super();
-		this.clientId = config.CLIENT_ID;
-		this.clientSecret = config.CLIENT_SECRET;
+		this.__dirname = path.dirname(fileURLToPath(import.meta.url));
 		this.tracksNotFound = [];
 		this.trackIds = [];
-	}
-
-	getUserAccessToken = async () => {
-		let spotifyApi = new SpotifyWebApi({
+		this.tracksNotFoundJsonPath = "/tracksNotFound.json";
+		this.tracksFoundJsonPath = "/tracksFound.json";
+		this.spotifyApi = new SpotifyWebApi({
 			clientId: this.clientId,
 			clientSecret: this.clientSecret,
 		});
+	}
 
-		const credentialsRes = await spotifyApi.clientCredentialsGrant();
+	getUserAccessToken = async () => {
+		this.spotifyApi = new SpotifyWebApi({
+			clientId: this.clientId,
+			clientSecret: this.clientSecret,
+			redirectUri: this.redirectUri,
+		});
+
+		const credentialsRes = await this.spotifyApi.clientCredentialsGrant();
 		const access_token = credentialsRes.body.access_token;
 
 		return access_token;
@@ -39,6 +65,7 @@ export default class SpotifyWrapper extends SpotifyWebApi {
 	sleep = (ms) => {
 		return new Promise((resolve) => setTimeout(resolve, ms));
 	};
+
 	/**
 	 * @description
 	 * 		1. Search for track on spotify
@@ -58,7 +85,7 @@ export default class SpotifyWrapper extends SpotifyWebApi {
 	searchTrack = async (trackQuery, artistName) => {
 		try {
 			const trackData = await fetch(
-				`https://api.spotify.com/v1/search?q=${trackQuery}&type=track`,
+				`${this.spotifyAPIBaseURL}search?q=${trackQuery}&type=track`,
 				{
 					headers: {
 						Authorization: `Bearer ${this.access_token}`,
@@ -83,6 +110,7 @@ export default class SpotifyWrapper extends SpotifyWebApi {
 					trackUri: found?.uri,
 				};
 			} else {
+				// Add a filter here similar to the one above, to check if the artist name is in the list of artists and the track name matches partially
 				return {
 					trackExternalUrl: trackDataJson.tracks?.items[0].external_urls.spotify,
 					trackId: trackDataJson.tracks?.items[0].id,
@@ -106,7 +134,7 @@ export default class SpotifyWrapper extends SpotifyWebApi {
 	 * 	5. Write tracksNotFound array to file
 	 * 	6. Write trackIds array to file
 	 */
-	getTracksAndAddTracksToPlaylist = async (fs) => {
+	getTracksAndAddTracksToPlaylist = async () => {
 		const shazamTracks = JSON.parse(this.shazamTracksOutputJsonData);
 		const length = shazamTracks.length;
 		let i = 0;
@@ -131,17 +159,97 @@ export default class SpotifyWrapper extends SpotifyWebApi {
 			i += 1;
 		}
 
-		fs.createWriteStream("tracksNotFound.json", "");
-		fs.createWriteStream("tracksFound.json", "");
+		fs.createWriteStream(this.tracksNotFoundJsonPath, "");
+		fs.createWriteStream(this.tracksFoundJsonPath, "");
 
-		fs.appendFile("tracksNotFound.json", JSON.stringify(this.tracksNotFound), (err) => {
+		fs.appendFile(this.tracksNotFoundJsonPath, JSON.stringify(this.tracksNotFound), (err) => {
 			if (err) console.log(err);
 		});
 
-		fs.appendFile("tracksFound.json", JSON.stringify(this.trackIds), (err) => {
+		fs.appendFile(this.tracksFoundJsonPath, JSON.stringify(this.trackIds), (err) => {
 			if (err) console.log(err);
 		});
 	};
 
-	// getTracksAndAddTracksToPlaylist = async (fs) => {}
+	readTracksFoundJson = async () => {
+		const tracksFound = await fs.readFile(this.__dirname + this.tracksFoundJsonPath, "utf8");
+		return JSON.parse(tracksFound).filter(Boolean);
+	};
+
+	buildAPITokenQuery = (code) => {
+		return Object.entries({
+			code,
+			grant_type: "authorization_code",
+			redirect_uri: this.encodedRedirectURI,
+		})
+			.reduce((acc, [key, value]) => acc + `${key}=${value}&`, "")
+			.slice(0, -1);
+	};
+
+	getSpotifyAccessToken = async (code) => {
+		const queryData = this.buildAPITokenQuery(code);
+
+		try {
+			const response = await axios({
+				method: "post",
+				url: this.spotifyTokenAPIBaseURL,
+				data: queryData,
+				headers: {
+					"content-type": "application/x-www-form-urlencoded",
+					Authorization: this.authorization,
+				},
+			});
+
+			return response;
+		} catch (err) {
+			throw err;
+		}
+	};
+
+	addTracksToPlaylistAPI = async (uris, accessToken) => {
+		try {
+			const response = await axios({
+				method: "post",
+				url: `${this.spotifyAPIBaseURL}/playlists/${this.playlistId}/tracks`,
+				data: {
+					uris,
+				},
+				headers: {
+					Authorization: `Bearer ${accessToken}`,
+				},
+			});
+
+			if (response.status === 201) {
+				return "Added songs to playlist";
+			} else {
+				return response;
+			}
+		} catch (error) {
+			throw error;
+		}
+	};
+
+	addTracksToPlaylist = async (code) => {
+		try {
+			const parsedTracksFound = await this.readTracksFoundJson();
+
+			const accessTokenResponse = await this.getSpotifyAccessToken(code);
+			const accessToken = accessTokenResponse.data.access_token;
+
+			if (accessTokenResponse.status === 200) {
+				let i = 0;
+				while (i < parsedTracksFound.length) {
+					const uris = parsedTracksFound.slice(i, i + 100);
+
+					await addTracksToPlaylistAPI(uris, accessToken);
+
+					i += 100;
+				}
+			} else {
+				return accessTokenResponse;
+			}
+		} catch (err) {
+			return err;
+		}
+	};
 }
