@@ -15,7 +15,7 @@ class ShazamTrackExtractor extends SpotifyWebApi {
 		this.pathToOutputFile = this.__dirname + "/output.txt";
 		this.outputJson = "shazamOutput.json";
 		this.shazamTracksOutputPath = "/shazamTracks.json";
-
+		this.firstOneHundred = "/firstonehundred.json";
 		this.regExpToMatchMonthNameAbbr =
 			/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s(0[1-9]|[12][0-9]|3[01]),\s\d{4}\b/g;
 	}
@@ -90,7 +90,7 @@ class ShazamTrackExtractor extends SpotifyWebApi {
 
 	getShazamJsonOutputData = () => {
 		return new Promise((resolve, reject) => {
-			fs.readFile(path + this.shazamTracksOutputPath, "utf8", (err, data) => {
+			fs.readFile(this.__dirname + this.firstOneHundred, "utf8", (err, data) => {
 				if (err) {
 					reject(err);
 				}
@@ -101,12 +101,11 @@ class ShazamTrackExtractor extends SpotifyWebApi {
 
 	async run(code) {
 		// Get and set spotify access data
-		this.access_token = await this.getUserAccessToken();
-		this.setAccessToken(this.access_token);
-		this.shazamTracksOutputJsonData = await this.getShazamJsonOutputData();
-		this.getTracksAndAddTracksToPlaylist();
-
-		// await this.addToPL(code);
+		// this.access_token = await this.getUserAccessToken();
+		// this.setAccessToken(this.access_token);
+		// this.shazamTracksOutputJsonData = await this.getShazamJsonOutputData();
+		// await this.getTracksAndAddTracksToPlaylist();
+		// await this.addTracksToPlaylist(code);
 	}
 }
 
